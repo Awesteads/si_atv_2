@@ -4,6 +4,25 @@ Cada agente deve ter um arquivo de configuração.
 
 ---
 
+## Tarefa 2 – Exploração e Agrupamento
+
+Implementação completa do cenário solicitado na tarefa 2 está disponível em `sma/tarefa2`.
+
+### Como executar
+
+```bash
+cd sma/tarefa2
+python -m tarefa2.main --config config/tlim1000
+# ou para TLIM=8000
+python -m tarefa2.main --config config/tlim8000
+```
+
+Parâmetros adicionais permitem alterar a pasta de sinais vitais (`--victims`),
+os arquivos do ambiente (`--environment`), o diretório de saída dos arquivos de
+cluster (`--output`) e o número de agrupamentos (`--clusters`).
+
+Os arquivos `cluster*.txt` são escritos no diretório informado em `--output`.
+
 ## Parâmetros
 
 | Propriedade        | Valor             | Descrição                                                |
