@@ -67,7 +67,7 @@ if __name__ == "__main__":
 
      # --- 🎨 Exibir mapa unificado com triagem ---
     try:
-        from environment.visualizer import show_saved_map
+
 
         tri_colors = {
             "green": (0, 1, 0),
@@ -81,7 +81,7 @@ if __name__ == "__main__":
 
     except Exception as e:
         print(f"[VISUALIZER] Erro ao exibir mapa unificado colorido: {e}")
-        
+
     # 🔹 Resultados originais (mantidos)
     for agent in ex_agents:
         agent.save_results(f"teste/victims_found_{agent.NAME}.txt")

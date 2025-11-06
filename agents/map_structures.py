@@ -2,6 +2,7 @@
 from __future__ import annotations
 from dataclasses import dataclass, field, asdict
 from typing import Optional, Tuple, Dict, Set, Iterable
+import os
 import csv
 
 # Valores válidos para status: "unknown" | "clear" | "wall" | "out_of_bounds"
@@ -21,6 +22,7 @@ class CellInfo:
     victim_id: Optional[int] = None
     vitals_read: bool = False
     read_step: Optional[int] = None
+    vitals_raw: Optional[str] = None
 
     # Rastreabilidade
     discovered_by: Optional[str] = None
@@ -62,13 +64,28 @@ def iter_csv_rows(agent: str, grid: MapGrid) -> Iterable[list]:
         if cell.status != "unknown":
             yield _row_from_cell(agent, xy, cell)
 
-def write_map_csv(filepath: str, agent: str, grid: MapGrid) -> None:
-    """Salva o mapa local do agente em CSV no formato padronizado."""
+def write_map_csv(filepath, agent_name, grid):
+    os.makedirs(os.path.dirname(filepath), exist_ok=True)
     with open(filepath, "w", newline="", encoding="utf-8") as f:
-        w = csv.writer(f)
-        w.writerow(CSV_HEADER)
-        for row in iter_csv_rows(agent, grid):
-            w.writerow(row)
+        writer = csv.writer(f)
+        # + vitals ao final
+        writer.writerow(["x", "y", "status", "floor_factor", "victim_present", "victim_id", "vitals"])
+        for (x, y), cell in grid.items():
+            status = getattr(cell, "status", "unknown")
+            floor_factor = getattr(cell, "floor_factor", "")
+            victim_present = int(getattr(cell, "victim_present", 0))
+            victim_id = getattr(cell, "victim_id", "")
+            vitals_raw = getattr(cell, "vitals_raw", None)
+
+            if isinstance(victim_id, (tuple, list)):
+                victim_id = victim_id[0]
+            elif victim_id is None:
+                victim_id = ""
+
+            # escreve a string das vitais (ex.: "[120, 18, 37.8]") ou vazio
+            writer.writerow([x, y, status, floor_factor, victim_present, victim_id, (vitals_raw or "")])
+
+    print(f"[SAVE] {agent_name}: mapa salvo com {len(grid)} células em {filepath}")
 
 # ---------------------------------------------------------------------------
 # Funções auxiliares de registro para uso pelos agentes
@@ -129,15 +146,21 @@ def record_victim(
     victim_id: int,
     vitals_read: bool,
     step: int,
+    vitals=None,               # <- NOVO
 ) -> None:
-    """
-    Registra a presença de uma vítima em (x,y) e, se aplicável, a leitura dos sinais vitais.
-    """
     cell = grid.get(xy, CellInfo())
     cell.victim_present = True
     cell.victim_id = victim_id
     cell.discovered_by = cell.discovered_by or agent
+
     if vitals_read:
         cell.vitals_read = True
         cell.read_step = step
+        # guarda a representação textual da lista retornada pelo vs
+        try:
+            cell.vitals_raw = repr(vitals) if vitals is not None else None
+        except Exception:
+            cell.vitals_raw = None
+
     grid[xy] = cell
+

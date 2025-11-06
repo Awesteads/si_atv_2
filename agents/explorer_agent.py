@@ -116,13 +116,37 @@ class ExplorerAgent(AbstAgent):
         self.visited.add(self.pos)
         # registra célula atual como visitada/clear
         record_cell(self.name, self.grid, self.pos, "clear", self.step_count)
+        # Verifica se há vítima
         vic_id = self.check_for_victim()
         if vic_id != VS.NO_VICTIM:
-            self.read_vital_signals()  # CONSOME TEMPO (TEMOS QUE REPLANEJAR)
+            # Lê sinais vitais (RETORNA lista ou VS.TIME_EXCEEDED)
+            vitals = self.read_vital_signals()
 
-        # registra vítima, se houver
-        if vic_id != VS.NO_VICTIM:
-            record_victim(self.name, self.grid, self.pos, vic_id, vitals_read=True, step=self.step_count)
+            # Captura o ID real da vítima pelo ambiente
+            env = self.get_env()
+            victim_real_id = None
+            try:
+                victim_data = env.dic["VICTIMS"]
+                if isinstance(victim_data, dict):
+                    for v_id, v_info in victim_data.items():
+                        if tuple(v_info["pos"]) == self.pos:
+                            victim_real_id = v_id
+                            break
+            except Exception:
+                pass
+
+            victim_id_to_save = victim_real_id if victim_real_id is not None else vic_id
+
+            # Registra a vítima incluindo as vitais retornadas
+            record_victim(
+                self.name,
+                self.grid,
+                self.pos,
+                victim_id_to_save,
+                vitals_read=bool(vitals),   # True se veio algo
+                step=self.step_count,
+                vitals=vitals,              # <- NOVO
+            )
 
         # Se estamos em modo de retorno, tenta dar 1 passo para base
         # MELHORAR ISSO PARECE QUE ESTÁ FAZENDO MAIS DE 1 AÇÃO POR CICLO
