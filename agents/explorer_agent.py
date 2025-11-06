@@ -1,5 +1,9 @@
 from vs.abstract_agent import AbstAgent
 from vs.constants import VS
+import os
+from agents.map_structures import (
+    MapGrid, record_cell, record_neighbors, record_victim, write_map_csv
+)
 
 
 class ExplorerAgent(AbstAgent):
@@ -11,7 +15,7 @@ class ExplorerAgent(AbstAgent):
 
     def __init__(self, env, config_file, seed=None):
         super().__init__(env, config_file)
-
+        self.name = os.path.splitext(os.path.basename(config_file))[0]
         # Estado interno do algoritmo (incremental: 1 ação por deliberate)
         self._rng = (
             __import__("random").Random(seed)
@@ -37,6 +41,11 @@ class ExplorerAgent(AbstAgent):
         # Mapeamento de movimentos (mesma convenção de AbstAgent.AC_INCR)
         # 0:u, 1:ur, 2:r, 3:dr, 4:d, 5:dl, 6:l, 7:ul
         self._dirs = list(AbstAgent.AC_INCR.items())
+
+        # mapa local do agente
+        self.grid: MapGrid = {}
+        self.step_count = 0  # contador lógico de passos (para last_seen_step)
+
 
     # ---------- helpers ----------
 
@@ -96,6 +105,7 @@ class ExplorerAgent(AbstAgent):
             self.returning = False
             self.return_path = []
             self._initialized = True
+            record_cell(self.name, self.grid, self.pos, "clear", self.step_count)
 
         # Se acabou o tempo, não há mais o que fazer
         if self.get_rtime() < 0.0:
@@ -104,9 +114,15 @@ class ExplorerAgent(AbstAgent):
 
         # Marca visita / detecta vítima
         self.visited.add(self.pos)
+        # registra célula atual como visitada/clear
+        record_cell(self.name, self.grid, self.pos, "clear", self.step_count)
         vic_id = self.check_for_victim()
         if vic_id != VS.NO_VICTIM:
             self.read_vital_signals()  # CONSOME TEMPO (TEMOS QUE REPLANEJAR)
+
+        # registra vítima, se houver
+        if vic_id != VS.NO_VICTIM:
+            record_victim(self.name, self.grid, self.pos, vic_id, vitals_read=True, step=self.step_count)
 
         # Se estamos em modo de retorno, tenta dar 1 passo para base
         # MELHORAR ISSO PARECE QUE ESTÁ FAZENDO MAIS DE 1 AÇÃO POR CICLO
@@ -143,6 +159,14 @@ class ExplorerAgent(AbstAgent):
         # Não retornando: decide próxima expansão DFS
         neighbors = self._neighbors_clear(self.pos)
 
+        # registra vizinhos observados (clear/wall)
+        neigh_dict = {n: "clear" for n in neighbors}
+        for (x, y) in self.obstacles_found:
+            if (x, y) not in neigh_dict:
+                neigh_dict[(x, y)] = "wall"
+        record_neighbors(self.name, self.grid, self.pos, neigh_dict, self.step_count)
+
+
         # Reserva de energia simples: se o custo “mínimo” p/ voltar já ameaça TLIM, inicie retorno
         if self._step_cost_lower_bound(self.pos, self._base) >= self.get_rtime():
             self.returning = True
@@ -164,6 +188,8 @@ class ExplorerAgent(AbstAgent):
             if res == VS.EXECUTED:
                 self.pos = nxt
                 self.stack.append(nxt)
+                self.step_count += 1
+                record_cell(self.name, self.grid, self.pos, "clear", self.step_count)
                 return True
             else:
                 # Bateu: marca obstáculo
@@ -194,6 +220,11 @@ class ExplorerAgent(AbstAgent):
 
         # Já na base e nada a explorar
         self.set_state(VS.ENDED)
+        output_dir = "outputs"
+        os.makedirs(output_dir, exist_ok=True)
+        csv_path = os.path.join(output_dir, f"map_explorer_{self.name}.csv")
+        write_map_csv(csv_path, self.name, self.grid)
+        print(f"[{self.name}] Mapa salvo em {csv_path} ({len(self.grid)} células registradas)")
         return False
 
     # ---------- utilidades compatíveis com sua versão antiga ----------
