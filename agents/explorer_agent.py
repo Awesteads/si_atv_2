@@ -1,5 +1,10 @@
+import os
+from typing import Dict
+
 from vs.abstract_agent import AbstAgent
 from vs.constants import VS
+
+from agents.map_sync import AgentLocalMap, VictimInfo
 
 
 class ExplorerAgent(AbstAgent):
@@ -24,6 +29,7 @@ class ExplorerAgent(AbstAgent):
         self.victims_found = set()  # {(x, y)}
         self.obstacles_found = set()  # {(x, y)}
         self.visited = set()  # {(x, y)}
+        self.victim_data: Dict[int, VictimInfo] = {}
 
         # Pilha do DFS e posição atual (rastreamos localmente)
         self.stack = []
@@ -106,7 +112,19 @@ class ExplorerAgent(AbstAgent):
         self.visited.add(self.pos)
         vic_id = self.check_for_victim()
         if vic_id != VS.NO_VICTIM:
-            self.read_vital_signals()  # CONSOME TEMPO (TEMOS QUE REPLANEJAR)
+            vitals = self.read_vital_signals()  # CONSOME TEMPO (TEMOS QUE REPLANEJAR)
+            if vitals == VS.TIME_EXCEEDED:
+                self.set_state(VS.DEAD)
+                return False
+            if vitals:
+                self.victims_found.add((self.pos[0], self.pos[1], vic_id))
+                info = VictimInfo(
+                    vid=vic_id,
+                    position=self.pos,
+                    signals=list(vitals),
+                    sources={self.NAME},
+                )
+                self.victim_data[vic_id] = info
 
         # Se estamos em modo de retorno, tenta dar 1 passo para base
         # MELHORAR ISSO PARECE QUE ESTÁ FAZENDO MAIS DE 1 AÇÃO POR CICLO
@@ -198,6 +216,17 @@ class ExplorerAgent(AbstAgent):
 
     # ---------- utilidades compatíveis com sua versão antiga ----------
 
+    def get_local_map(self) -> AgentLocalMap:
+        """Return a snapshot of the explored region."""
+
+        return AgentLocalMap(
+            name=self.NAME,
+            base=self._base,
+            visited=set(self.visited),
+            obstacles=set(self.obstacles_found),
+            victims={vid: info.copy() for vid, info in self.victim_data.items()},
+        )
+
     def save_results(self, victims_path):
         """
         Exporta resultados como no seu Explorer antigo:
@@ -207,6 +236,12 @@ class ExplorerAgent(AbstAgent):
         import csv
 
         obst_path = victims_path.replace(".txt", "_obst.txt")
+        os.makedirs(os.path.dirname(victims_path), exist_ok=True)
+        with open(victims_path, "w", newline="") as f:
+            writer = csv.writer(f)
+            writer.writerow(["victim_id", "x", "y", "signals..."])
+            for vid, info in sorted(self.victim_data.items()):
+                writer.writerow([vid, info.position[0], info.position[1], *info.signals])
         with open(obst_path, "w", newline="") as f:
             w = csv.writer(f)
             for x, y in sorted(self.obstacles_found):
