@@ -1,28 +1,27 @@
-"""  ABSTRACT AGENT
-     @Author: Tacla (UTFPR)
-     It has the default methods for all the agents supposed to run in
-     the environment """
+"""ABSTRACT AGENT
+@Author: Tacla (UTFPR)
+It has the default methods for all the agents supposed to run in
+the environment"""
 
 import os
 from abc import ABC, abstractmethod
-from .constants import VS
 
 
 class AbstAgent(ABC):
-    """ This class represents a generic agent and
-    must be implemented by a concrete class. """
+    """This class represents a generic agent and
+    must be implemented by a concrete class."""
 
     # Class attributes
     # Define increments for the walk actions
     AC_INCR = {
         0: (0, -1),  # u : Up
         1: (1, -1),  # ur: Upper right diagonal
-        2: (1, 0),   # r : Right
-        3: (1, 1),   # dr: Down right diagonal
-        4: (0, 1),   # d : Down
+        2: (1, 0),  # r : Right
+        3: (1, 1),  # dr: Down right diagonal
+        4: (0, 1),  # d : Down
         5: (-1, 1),  # dl: Down left left diagonal
         6: (-1, 0),  # l : Left
-        7: (-1, -1)  # ul: Up left diagonal
+        7: (-1, -1),  # ul: Up left diagonal
     }
 
     def __init__(self, env, config_file):
@@ -32,23 +31,24 @@ class AbstAgent(ABC):
         @param env referencia o ambiente
         @param config_file: the absolute path to the agent's config file
         """
-        self.NAME = ""     # public: the name of the agent
-        self.TLIM = 0.0    # public: time limit to execute (cannot be exceeded)
-        self.COST_LINE = 0.0        # public: basic cost to walk one step hor or vertically
-        self.COST_DIAG = 0.0        # public: basic cost to walk one step diagonally
-        self.COST_READ = 0.0        # public: basic cost to read a victim's vital sign
-        self.COST_FIRST_AID = 0.0   # public: basic cost to drop the first aid package to a victim
-        self.COLOR = (100, 100, 100)       # public: color of the agent
-        self.TRACE_COLOR = (140, 140, 140) # public: color for the visited cells
-        self.__env = env            # private - ref. to the environment
-        self.__phy = None           # private - ref. to the physical part of 
-                                    # the agent in the env
+        self.NAME = ""  # public: the name of the agent
+        self.TLIM = 0.0  # public: time limit to execute (cannot be exceeded)
+        self.COST_LINE = 0.0  # public: basic cost to walk one step hor or vertically
+        self.COST_DIAG = 0.0  # public: basic cost to walk one step diagonally
+        self.COST_READ = 0.0  # public: basic cost to read a victim's vital sign
+        self.COST_FIRST_AID = (
+            0.0  # public: basic cost to drop the first aid package to a victim
+        )
+        self.COLOR = (100, 100, 100)  # public: color of the agent
+        self.TRACE_COLOR = (140, 140, 140)  # public: color for the visited cells
+        self.__env = env  # private - ref. to the environment
+        self.__phy = None  # private - ref. to the physical part of
+        # the agent in the env
         # stores the folder where the agents' config files are
-        self.config_folder = os.path.dirname(config_file)     
+        self.config_folder = os.path.dirname(config_file)
 
         # Read agents config file for controlling time
         with open(config_file, "r") as file:
-
             # Read each line of the file
             for line in file:
                 # Split the line into words
@@ -59,14 +59,14 @@ class AbstAgent(ABC):
                 if keyword == "NAME":
                     self.NAME = words[1]
                 elif keyword == "COLOR":
-                    r = int(words[1].strip('(), '))
-                    g = int(words[2].strip('(), '))
-                    b = int(words[3].strip('(), '))
+                    r = int(words[1].strip("(), "))
+                    g = int(words[2].strip("(), "))
+                    b = int(words[3].strip("(), "))
                     self.COLOR = (r, g, b)  # a tuple
                 elif keyword == "TRACE_COLOR":
-                    r = int(words[1].strip('(), '))
-                    g = int(words[2].strip('(), '))
-                    b = int(words[3].strip('(), '))
+                    r = int(words[1].strip("(), "))
+                    g = int(words[2].strip("(), "))
+                    b = int(words[3].strip("(), "))
                     self.TRACE_COLOR = (r, g, b)  # a tuple
                 elif keyword == "TLIM":
                     self.TLIM = float(words[1])
@@ -84,18 +84,18 @@ class AbstAgent(ABC):
 
     @abstractmethod
     def deliberate(self) -> bool:
-        """ This is the choice of the next action. The simulator calls this
+        """This is the choice of the next action. The simulator calls this
         method at each reasonning cycle if and only if the agent is ACTIVE.
         Must be implemented in every agent. The agent should execute only on
         walk acton per deliberation.
         @return True: there's one or more actions to do
-        @return False: there's no more action to do """
+        @return False: there's no more action to do"""
 
         pass
 
     # The public methods below, you may use when programming your agent
     def get_rtime(self):
-        """ Public method for getting the agent remaining battery time
+        """Public method for getting the agent remaining battery time
         (it's like a gauge)
         @return: the remaining battery time (a float value).
         When < 0, the agent is dead."""
@@ -105,17 +105,17 @@ class AbstAgent(ABC):
         return self.__phy._state
 
     def set_state(self, value):
-        """ This protected method allows the environment to change
+        """This protected method allows the environment to change
         the state of the agent"""
         self.__phy._state = value
 
     def get_env(self):
-        """ This protected method allows the environment to change
+        """This protected method allows the environment to change
         the state of the agent"""
         return self.__env
 
     def walk(self, dx, dy):
-        """ Public method for moving the agent's body one cell to any direction
+        """Public method for moving the agent's body one cell to any direction
         (if possible)
         @param dx: an int value corresponding to deplacement in the x axis
         @param dy: an int value corresponding to deplacement in the y axis
@@ -127,7 +127,7 @@ class AbstAgent(ABC):
         return self.__phy._walk(dx, dy)
 
     def check_walls_and_lim(self):
-        """ Public method for checking walls and the grid limits in the
+        """Public method for checking walls and the grid limits in the
         neighborhood of the current position of the agent.
         @returns: a vector of eight integers indexed in a clockwise manner.
            The first position in the vector is the position above the current
@@ -141,19 +141,19 @@ class AbstAgent(ABC):
         return self.__phy._check_walls_and_lim()
 
     def check_for_victim(self):
-        """ Public method for testing if there is a victim at the current
+        """Public method for testing if there is a victim at the current
         position of the agent. The victim sequential number starts at zero.
         Zero corresponds to the first victim of the data files env_victims.txt
         and env_vital_signals.txt, 1 to the 2nd,...
         @returns:
         - the sequential number of the victim (integer), or
         - VS.NO_VICTIM if there is no victim at the current position of
-          the agent. """
+          the agent."""
 
         return self.__phy._check_for_victim()
 
     def read_vital_signals(self):
-        """ Public method for reading the vital signals of a victim at the same
+        """Public method for reading the vital signals of a victim at the same
         position of the agent. Every tentative of reading the vital signal
         out of position consumes time
         @returns:
@@ -166,7 +166,7 @@ class AbstAgent(ABC):
         return self.__phy._read_vital_signals()
 
     def first_aid(self):
-        """ Public method for dropping the first aid package to the victim at
+        """Public method for dropping the first aid package to the victim at
         the same position of the agent.
         @returns:
         - VS.TIME_EXCEEDED when the agent has no enough battery time to execute
@@ -174,5 +174,3 @@ class AbstAgent(ABC):
         - True when the first aid is succesfully delivered
         - False when there is no victim at the current position of the agent"""
         return self.__phy._first_aid()
-
-

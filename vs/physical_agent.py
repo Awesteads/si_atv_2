@@ -14,17 +14,17 @@ class PhysAgent:
         @param x_base: initial value for the coordinate x
         @param y_base: initial value for the coordinate y"""
 
-        self.mind = mind              # it is the agent's mind
-        self.env = env                # it is the environment
-        self.x_base = x_base          # x coordinate of the base
-        self.y_base = y_base          # y coordinate of the base
-        self.x = x_base               # current x coordinate: at Base
-        self.y = y_base               # current y coordinate
-        self._rtime = mind.TLIM       # current remaining time
-        self._state = state           # -1=dead  0=successfully ended 1=alive
+        self.mind = mind  # it is the agent's mind
+        self.env = env  # it is the environment
+        self.x_base = x_base  # x coordinate of the base
+        self.y_base = y_base  # y coordinate of the base
+        self.x = x_base  # current x coordinate: at Base
+        self.y = y_base  # current y coordinate
+        self._rtime = mind.TLIM  # current remaining time
+        self._state = state  # -1=dead  0=successfully ended 1=alive
 
     def _end_of_time(self):
-        """ This protected method allows the enviroment to check if time limit
+        """This protected method allows the enviroment to check if time limit
         was reached and if the agent is at the base.
         @return: True - time exceeded
                  False - time not exceeded"""
@@ -34,19 +34,18 @@ class PhysAgent:
         return False
 
     def _at_base(self):
-        """ This protected method allows the enviroment to check
+        """This protected method allows the enviroment to check
             if the agent is at the base.
         @return: True - the agent is at the base position
                  False - the agent is not at the base position"""
 
-        if (self.x == self.env.dic["BASE"][0] and
-            self.y == self.env.dic["BASE"][1]):
+        if self.x == self.env.dic["BASE"][0] and self.y == self.env.dic["BASE"][1]:
             return True
 
         return False
 
     def _walk(self, dx, dy):
-        """ Public method for moving the agent's body one cell to any direction
+        """Public method for moving the agent's body one cell to any direction
         The agent walks only if it is possible.
         @param dx: an int value corresponding to deplacement in the x axis
         @param dy: an int value corresponding to deplacement in the y axis
@@ -57,17 +56,21 @@ class PhysAgent:
         """
 
         # base time to be consumed
-        if dx != 0 and dy != 0:   # diagonal
+        if dx != 0 and dy != 0:  # diagonal
             base = self.mind.COST_DIAG
-        else:                     # walk vertical or horizontal
+        else:  # walk vertical or horizontal
             base = self.mind.COST_LINE
 
         new_x = self.x + dx
         new_y = self.y + dy
 
-        if (new_x >= 0 and new_x < self.env.dic["GRID_WIDTH"] and
-            new_y >= 0 and new_y < self.env.dic["GRID_HEIGHT"] and
-                self.env.obst[new_x][new_y] != 100):
+        if (
+            new_x >= 0
+            and new_x < self.env.dic["GRID_WIDTH"]
+            and new_y >= 0
+            and new_y < self.env.dic["GRID_HEIGHT"]
+            and self.env.obst[new_x][new_y] != 100
+        ):
             # print(f"{self.mind.NAME}: obstacle difficulty {self.env.obst[new_x][new_y]}")
             self._rtime -= base * self.env.obst[new_x][new_y]
 
@@ -87,7 +90,7 @@ class PhysAgent:
             return VS.BUMPED
 
     def _check_walls_and_lim(self):
-        """ Protected method for checking walls and the grid limits in the
+        """Protected method for checking walls and the grid limits in the
         neighborhood of the current position of the agent.
         @returns a vector of eight integers indexed in a clockwise manner.
         The first position in the vector is above the current position of the
@@ -99,8 +102,7 @@ class PhysAgent:
         - END means the end of the grid (value = 2)
         """
 
-        delta = [(0, -1), (1, -1), (1, 0), (1, 1),
-                 (0, 1), (-1, 1), (-1, 0), (-1, -1)]
+        delta = [(0, -1), (1, -1), (1, 0), (1, 1), (0, 1), (-1, 1), (-1, 0), (-1, -1)]
         obstacles = [VS.CLEAR] * 8
         i = 0
 
@@ -108,8 +110,12 @@ class PhysAgent:
             new_x = self.x + d[0]
             new_y = self.y + d[1]
 
-            if (new_x < 0 or new_x >= self.env.dic["GRID_WIDTH"] or
-                new_y < 0 or new_y >= self.env.dic["GRID_HEIGHT"]):
+            if (
+                new_x < 0
+                or new_x >= self.env.dic["GRID_WIDTH"]
+                or new_y < 0
+                or new_y >= self.env.dic["GRID_HEIGHT"]
+            ):
                 obstacles[i] = VS.END
             elif self.env.obst[new_x][new_y] == 100:
                 obstacles[i] = VS.WALL
@@ -121,7 +127,7 @@ class PhysAgent:
         return obstacles
 
     def _check_for_victim(self):
-        """ Protected method for testing if there is a victim at the current
+        """Protected method for testing if there is a victim at the current
         position of the agent
         @returns: the id number of the victim - an integer starting from zero
         that corresponds to the position of the victim in the data files
@@ -136,7 +142,7 @@ class PhysAgent:
         return vic_id
 
     def _read_vital_signals(self):
-        """ Protected method for reading the vital signals and marking a victim
+        """Protected method for reading the vital signals and marking a victim
         as found. The agent can only successfully execute this method if it is
         in the same position of the victim. Every tentative of reading the
         vital signal out of position consumes time.
@@ -165,7 +171,7 @@ class PhysAgent:
         return self.env.signals[vic_id][:-2]
 
     def _first_aid(self):
-        """ Protected method for dropping the first aid package to the victim
+        """Protected method for dropping the first aid package to the victim
         located at the same position of the agent.
         This method marks the victim as saved.
         @returns:
@@ -193,9 +199,9 @@ class PhysAgent:
         return True
 
     def _get_found_victims(self):
-        """ Protected method for returning the number of found victims by the
+        """Protected method for returning the number of found victims by the
         agent.
-        @returns a list with the id number of the found victims """
+        @returns a list with the id number of the found victims"""
 
         victims = []
 
@@ -208,9 +214,9 @@ class PhysAgent:
         return victims
 
     def _get_saved_victims(self):
-        """ Protected method for returning the number of saved victims by the
+        """Protected method for returning the number of saved victims by the
         agent.
-        @returns a list with the id number of the saved victims """
+        @returns a list with the id number of the saved victims"""
 
         victims = []
 
