@@ -2,6 +2,8 @@ import os
 from agents.explorer_agent import ExplorerAgent
 from vs.constants import VS
 from vs.environment import Env
+from analysis.statistics import overlap_metric
+from analysis.cluster_victims import main as run_cluster
 import config as cfg
 
 
@@ -63,6 +65,23 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"[UNIFY] Erro durante unificação: {e}")
 
+     # --- 🎨 Exibir mapa unificado com triagem ---
+    try:
+        from environment.visualizer import show_saved_map
+
+        tri_colors = {
+            "green": (0, 1, 0),
+            "yellow": (1, 1, 0),
+            "red": (1, 0, 0),
+            "black": (0.2, 0.2, 0.2),
+        }
+
+        print("\n[VISUALIZER] Exibindo mapa unificado com cores de triagem...\n")
+        show_saved_map("outputs/map_unificado.txt", triage_colors=tri_colors)
+
+    except Exception as e:
+        print(f"[VISUALIZER] Erro ao exibir mapa unificado colorido: {e}")
+        
     # 🔹 Resultados originais (mantidos)
     for agent in ex_agents:
         agent.save_results(f"teste/victims_found_{agent.NAME}.txt")
@@ -72,9 +91,6 @@ if __name__ == "__main__":
 
     try:
         print("\n=== ETAPA 3: Estatísticas e Clustering ===")
-        from analysis.statistics import overlap_metric
-        from analysis.cluster_victims import main as run_cluster
-
         # Estatísticas
         per_agent, ve, s = overlap_metric()
         print(f"\n[STATS] Vítimas por explorador: {per_agent}")

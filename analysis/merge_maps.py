@@ -5,9 +5,10 @@ from collections import defaultdict
 from statistics import mean
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd  # 🟢 ADIÇÃO
 
 OUTPUT_DIR = "outputs"
-UNIFIED_FILE = os.path.join(OUTPUT_DIR, "map_unificado.csv")
+UNIFIED_FILE = os.path.join(OUTPUT_DIR, "map_unificado.txt")  # 🔄 volta pro .txt (compatível com visualizer)
 
 # prioridade de status (para resolver conflitos)
 STATUS_PRIORITY = {"wall": 3, "clear": 2, "unknown": 1, "out_of_bounds": 0}
@@ -52,23 +53,51 @@ def unify_maps(maps):
         # vítima se qualquer um detectou
         victim_present = any(int(c["victim_present"]) for c in cells)
 
+        # 🟢 ADIÇÃO: triagem inicial None
+        tri_value = None
+
+        # 🟢 ADIÇÃO: tenta pegar tri do dataset se houver vítima
+        if victim_present:
+            # tenta capturar o victim_id se existir no CSV do agente
+            victim_ids = [
+                int(c["victim_id"]) for c in cells if "victim_id" in c and c["victim_id"].isdigit()
+            ]
+            if victim_ids:
+                victim_id = victim_ids[0]
+                tri_value = get_tri_from_dataset(victim_id)
+
         unified[xy] = {
             "x": xy[0],
             "y": xy[1],
             "status": chosen_status,
             "floor_factor": avg_floor,
             "victim_present": int(victim_present),
+            "tri": tri_value,  # 🟢 ADIÇÃO
         }
 
     return unified
 
 
+# 🟢 ADIÇÃO: função para buscar tri no dataset de vítimas
+VICT_DATASET = "datasets/vict/408v/data.csv"
+_vict_df = None
+def get_tri_from_dataset(victim_id):
+    global _vict_df
+    if _vict_df is None:
+        _vict_df = pd.read_csv(VICT_DATASET)
+        _vict_df = _vict_df.reset_index().rename(columns={"index": "victim_id"})
+    row = _vict_df[_vict_df["victim_id"] == victim_id]
+    if not row.empty:
+        return row.iloc[0]["tri"]
+    return None
+
+
 def save_unified_map(unified, filepath=UNIFIED_FILE):
-    """Salva o mapa unificado como CSV"""
+    """Salva o mapa unificado como TXT (compatível com visualizer)."""
     os.makedirs(os.path.dirname(filepath), exist_ok=True)
     with open(filepath, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
-        writer.writerow(["x", "y", "status", "floor_factor", "victim_present"])
+        writer.writerow(["x", "y", "status", "floor_factor", "victim_present", "tri"])
         for cell in unified.values():
             writer.writerow([
                 cell["x"],
@@ -76,6 +105,7 @@ def save_unified_map(unified, filepath=UNIFIED_FILE):
                 cell["status"],
                 cell["floor_factor"],
                 cell["victim_present"],
+                cell["tri"],
             ])
     print(f"[UNIFY] Mapa unificado salvo em {filepath} ({len(unified)} células)")
 
@@ -101,17 +131,26 @@ def plot_unified_map(unified):
             color = (0.7, 0.7, 0.7)
 
         if cell["victim_present"]:
-            color = (1, 0, 0)  # vermelho
+            # 🟢 ADIÇÃO: colore conforme triagem
+            tri = cell.get("tri", None)
+            if tri == "green" or tri == 0:
+                color = (0, 1, 0)
+            elif tri == "yellow" or tri == 1:
+                color = (1, 1, 0)
+            elif tri == "red" or tri == 2:
+                color = (1, 0, 0)
+            elif tri == "black" or tri == 3:
+                color = (0.2, 0.2, 0.2)
+            else:
+                color = (1, 0, 0)
 
-        # não inverter manualmente — vamos deixar o imshow corrigir
         img[y, x] = color
 
     plt.figure(figsize=(8, 8))
-    plt.imshow(img, origin='upper')  # 🔹 ESSENCIAL: pygame-style
-    plt.title("Mapa Unificado (Exploradores)")
+    plt.imshow(img, origin="upper")
+    plt.title("Mapa Unificado (com Triagem)")
     plt.axis("off")
     plt.show()
-
 
 
 def unify_all_maps(outputs_dir=OUTPUT_DIR):
