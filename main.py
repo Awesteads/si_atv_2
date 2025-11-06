@@ -69,3 +69,25 @@ if __name__ == "__main__":
 
     env.print_results()
     env.print_acum_results()
+
+    try:
+        print("\n=== ETAPA 3: Estatísticas e Clustering ===")
+        from analysis.statistics import overlap_metric
+        from analysis.cluster_victims import main as run_cluster
+
+        # Estatísticas
+        per_agent, ve, s = overlap_metric()
+        print(f"\n[STATS] Vítimas por explorador: {per_agent}")
+        print(f"[STATS] Vítimas únicas (Ve): {ve}")
+        if s is not None:
+            print(f"[STATS] Sobreposição: {s:.4f}")
+        else:
+            print("[STATS] Sobreposição: N/A")
+
+        # Clustering
+        run_cluster(k=3)
+
+    except Exception as e:
+        print("\n[ERRO] Falha ao executar estatísticas ou clustering:")
+        import traceback
+        traceback.print_exc()
