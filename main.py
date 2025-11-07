@@ -46,12 +46,25 @@ if __name__ == "__main__":
     # 🔹 Executa simulação
     env.run()
 
+    # 🔸 Remove agentes mortos antes de salvar ou analisar
+    alive_agents = [a for a in ex_agents if a.get_state() != VS.DEAD]
+
+    if not alive_agents:
+        print("\n⚠️ Todos os exploradores morreram antes do fim da missão! Nenhum resultado válido.")
+    else:
+        print(f"\n[STATUS] {len(alive_agents)} exploradores ainda vivos no final da missão:")
+        for a in alive_agents:
+            state = a.get_state()
+            state_name = state.name if hasattr(state, "name") else state
+            print(f"  - {a.name} ({state_name})")
+
+
     # --- 🔸 Salvamento forçado dos mapas (novo) ---
     from agents.map_structures import write_map_csv
 
     os.makedirs("outputs", exist_ok=True)
 
-    for agent in ex_agents:
+    for agent in alive_agents:
         if hasattr(agent, "grid"):
             csv_path = os.path.join("outputs", f"map_explorer_{agent.name}.csv")
             write_map_csv(csv_path, agent.name, agent.grid)
@@ -77,13 +90,12 @@ if __name__ == "__main__":
         }
 
         print("\n[VISUALIZER] Exibindo mapa unificado com cores de triagem...\n")
-        show_saved_map("outputs/map_unificado.txt", triage_colors=tri_colors)
 
     except Exception as e:
         print(f"[VISUALIZER] Erro ao exibir mapa unificado colorido: {e}")
 
     # 🔹 Resultados originais (mantidos)
-    for agent in ex_agents:
+    for agent in alive_agents:
         agent.save_results(f"teste/victims_found_{agent.NAME}.txt")
 
     env.print_results()

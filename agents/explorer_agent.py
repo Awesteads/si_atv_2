@@ -1,5 +1,6 @@
 from vs.abstract_agent import AbstAgent
 from vs.constants import VS
+from agents.map_structures import VitalSigns
 import os
 from agents.map_structures import (
     MapGrid, record_cell, record_neighbors, record_victim, write_map_csv
@@ -35,8 +36,7 @@ class ExplorerAgent(AbstAgent):
 
         # Controle de retorno/base
         self.returning = False
-        self.return_path = []  # caminho (lista de (x,y)) para retornar (greedy + backtrack)
-        self._base = tuple(self.get_env().dic["BASE"])  # (x_base, y_base)
+        self._base = self._get_base_pos()
 
         # Mapeamento de movimentos (mesma convenção de AbstAgent.AC_INCR)
         # 0:u, 1:ur, 2:r, 3:dr, 4:d, 5:dl, 6:l, 7:ul
@@ -58,22 +58,21 @@ class ExplorerAgent(AbstAgent):
         return (dx + dy) * self.COST_LINE
 
     def _neighbors_clear(self, pos):
-        """Usa sensores locais para listar vizinhos livres e marcar obstáculos/limites."""
+        """Lista vizinhos livres com base no sensor (sem acessar env.dic)."""
         x, y = pos
-        obst = self.check_walls_and_lim()  # vetor 8 direções (CLEAR/WALL/END)
-        env = self.get_env()
+        obst = self.check_walls_and_lim()  # 8 direções
 
         free = []
-        for i, (dx, dy) in self._dirs:
+        for (i, (dx, dy)), flag in zip(self._dirs, obst):
             tx, ty = x + dx, y + dy
-            # Registra obstáculos/limites (quando vistos)
-            if 0 <= tx < env.dic["GRID_WIDTH"] and 0 <= ty < env.dic["GRID_HEIGHT"]:
-                if obst[i] == VS.WALL:
-                    self.obstacles_found.add((tx, ty))
-            # Vizinhos transitáveis
-            if obst[i] == VS.CLEAR:
+            if flag == VS.CLEAR:
                 free.append((tx, ty))
+            elif flag == VS.WALL:
+                # registra parede na célula alvo
+                self.obstacles_found.add((tx, ty))
+            # VS.END -> fora dos limites: não registra nada
         return free
+
 
     def _choose_unvisited(self, neighbors):
         unvisited = [n for n in neighbors if n not in self.visited]
@@ -88,6 +87,13 @@ class ExplorerAgent(AbstAgent):
         dx = 0 if bx == x else (1 if bx > x else -1)
         dy = 0 if by == y else (1 if by > y else -1)
         return (x + dx, y + dy), (dx, dy)
+    
+    def _get_base_pos(self):
+        # acesso via método público get_env(); o dicionário é detalhe do env,
+        # mas aceito aqui como “ponto único”.
+        base = self.get_env().dic.get("BASE")
+        return tuple(base) if base is not None else (0, 0)
+
 
     # ---------- ciclo de decisão (1 ação por chamada) ----------
 
@@ -103,14 +109,23 @@ class ExplorerAgent(AbstAgent):
             self.stack = [self.pos]
             self.visited = set()
             self.returning = False
-            self.return_path = []
             self._initialized = True
             record_cell(self.name, self.grid, self.pos, "clear", self.step_count)
 
         # Se acabou o tempo, não há mais o que fazer
-        if self.get_rtime() < 0.0:
+        remaining = self.get_rtime()
+        tlim = self.TLIM
+
+        # Se acabou o tempo, morre
+        if remaining < 0.0:
             self.set_state(VS.DEAD)
+            print(f"{self.name}: bateria esgotada, agente morreu.")
             return False
+
+        # Se a bateria estiver abaixo de 10%, inicia retorno à base
+        if remaining < 0.1 * tlim and not self.returning:
+            print(f"{self.name}: bateria crítica ({remaining:.1f}s restantes), iniciando retorno à base.")
+            self.returning = True
 
         # Marca visita / detecta vítima
         self.visited.add(self.pos)
@@ -121,53 +136,36 @@ class ExplorerAgent(AbstAgent):
         if vic_id != VS.NO_VICTIM:
             # Lê sinais vitais (RETORNA lista ou VS.TIME_EXCEEDED)
             vitals = self.read_vital_signals()
+            vitals_obj = VitalSigns(vitals if isinstance(vitals, list) else [])
 
-            # Captura o ID real da vítima pelo ambiente
-            env = self.get_env()
-            victim_real_id = None
-            try:
-                victim_data = env.dic["VICTIMS"]
-                if isinstance(victim_data, dict):
-                    for v_id, v_info in victim_data.items():
-                        if tuple(v_info["pos"]) == self.pos:
-                            victim_real_id = v_id
-                            break
-            except Exception:
-                pass
-
-            victim_id_to_save = victim_real_id if victim_real_id is not None else vic_id
-
-            # Registra a vítima incluindo as vitais retornadas
             record_victim(
                 self.name,
                 self.grid,
                 self.pos,
-                victim_id_to_save,
-                vitals_read=bool(vitals),   # True se veio algo
+                victim_id=vic_id,
+                vitals_read=bool(vitals),
                 step=self.step_count,
-                vitals=vitals,              # <- NOVO
+                vitals_raw=vitals_obj
             )
 
         # Se estamos em modo de retorno, tenta dar 1 passo para base
-        # MELHORAR ISSO PARECE QUE ESTÁ FAZENDO MAIS DE 1 AÇÃO POR CICLO
+        # --- Modo retorno à base ---
         if self.returning:
-            # 1) tentativa gananciosa
             target = self._base
             nxt_pos, (dx, dy) = self._greedy_step_towards(self.pos, target)
             res = self.walk(dx, dy)
+
             if res == VS.EXECUTED:
                 self.pos = nxt_pos
-                # terminou retorno?
                 if self.pos == self._base:
-                    self.set_state(VS.ENDED)
+                    print(f"{self.name}: retornou à base com sucesso! Missão encerrada.")
+                    self.set_state(VS.IDLE)
                     return False
-                return True  # continuará retornando em próximos ciclos
+                return True  # continua voltando nos próximos ciclos
             else:
-                # bateu: registra obstáculo observado naquela casa
+                # bateu em obstáculo: marca e tenta rota alternativa
                 self.obstacles_found.add(nxt_pos)
-                # 2) fallback: backtrack via pilha se houver
                 if len(self.stack) > 1:
-                    # volta 1 passo na pilha
                     prev = self.stack[-2]
                     dx = prev[0] - self.pos[0]
                     dy = prev[1] - self.pos[1]
@@ -176,9 +174,11 @@ class ExplorerAgent(AbstAgent):
                         self.pos = prev
                         self.stack.pop()
                         return True
-                # Sem como mover: encerra
+                # sem alternativa -> encerra sem morrer
+                print(f"{self.name}: bloqueado durante retorno, encerrando na posição {self.pos}.")
                 self.set_state(VS.IDLE)
                 return False
+
 
         # Não retornando: decide próxima expansão DFS
         neighbors = self._neighbors_clear(self.pos)

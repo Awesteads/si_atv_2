@@ -79,6 +79,7 @@ def plot_clusters(v_df, k=3):
     plt.legend()
     plt.grid(True, alpha=0.3)
     plt.tight_layout()
+    plt.gca().invert_yaxis()
     plt.show()  # <- Mostra o gráfico na tela
     print("[CLUSTER] Gráfico exibido na tela.")
 
